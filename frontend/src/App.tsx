@@ -16,16 +16,39 @@ const API = "http://127.0.0.1:8000";
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
-function Stats({ title, data, note }: { title: string; data: Performance; note?: string }) {
+function Stats({
+  title,
+  subtitle,
+  data,
+  note,
+}: {
+  title: string;
+  subtitle: string;
+  data: Performance;
+  note: string;
+}) {
   return (
     <div className="stats">
       <h3>{title}</h3>
-      {note && <p className="note">{note}</p>}
+      <p className="subtitle">{subtitle}</p>
+      <p className="note">{note}</p>
       <dl>
-        <div><dt>Total return</dt><dd>{pct(data.total_return)}</dd></div>
-        <div><dt>Sharpe ratio</dt><dd>{data.sharpe.toFixed(2)}</dd></div>
-        <div><dt>Max drawdown</dt><dd>{pct(data.max_drawdown)}</dd></div>
-        <div><dt>Trades</dt><dd>{data.trades}</dd></div>
+        <div>
+          <dt>Money made<span>$100 would become ${(100 * (1 + data.total_return)).toFixed(0)}</span></dt>
+          <dd>{pct(data.total_return)}</dd>
+        </div>
+        <div>
+          <dt>Worst drop<span>the biggest fall along the way</span></dt>
+          <dd>{pct(data.max_drawdown)}</dd>
+        </div>
+        <div>
+          <dt>Smoothness<span>reward per unit of risk; above 1 is good</span></dt>
+          <dd>{data.sharpe.toFixed(2)}</dd>
+        </div>
+        <div>
+          <dt>Times traded<span>how often it bought or sold</span></dt>
+          <dd>{data.trades}</dd>
+        </div>
       </dl>
     </div>
   );
@@ -77,10 +100,31 @@ export default function App() {
       <header>
         <h1>Backtest Lab</h1>
         <p className="sub">
-          Tests a moving-average strategy, tuning it on old data and scoring it on
-          data the tuning never saw.
+          Would this rule for buying shares actually have made money?
         </p>
       </header>
+
+      <section className="explainer">
+        <h2>What this tests</h2>
+        <p>
+          <strong>The rule:</strong> watch two averages of a share price — a
+          short one and a long one. Buy when the short average rises above the
+          long one, sell when it falls back below. That is the whole strategy,
+          and it is the only one tested here.
+        </p>
+        <p>
+          <strong>The problem with testing it:</strong> if you keep adjusting the
+          rule until it looks good on past prices, you have only made it fit
+          those particular prices — like revising with the answer key in front of
+          you. It then fails on prices it has not seen.
+        </p>
+        <p>
+          <strong>So the history is cut in two.</strong> The rule is adjusted
+          using the first 70% of the years, then scored on the last 30%, which
+          the adjusting never touched. Both scores are shown below, because the
+          gap between them is what tells you whether the rule is real.
+        </p>
+      </section>
 
       <div className="controls">
         <input
@@ -100,36 +144,53 @@ export default function App() {
       {result && (
         <>
           <p className="params">
-            Best parameters found on the training period:{" "}
-            <strong>{result.parameters.fast}-day</strong> vs{" "}
-            <strong>{result.parameters.slow}-day</strong> moving average.
+            The computer chose the two averages itself, using only the practice
+            years: a <strong>{result.parameters.fast}-day</strong> average
+            against a <strong>{result.parameters.slow}-day</strong> average.
           </p>
 
           <div className="grid">
             <Stats
-              title="In-sample"
+              title="Practice score"
+              subtitle="In-sample"
               data={result.in_sample}
-              note="Tuned on this period — flattering by construction"
+              note="The years the rule was adjusted on. Always flattering — ignore this number on its own."
             />
             <Stats
-              title="Out-of-sample"
+              title="Real test score"
+              subtitle="Out-of-sample"
               data={result.out_of_sample}
-              note="Never seen during tuning — the honest number"
+              note="Years the rule had never seen. This is the number that counts."
             />
             <Stats
-              title="Buy and hold"
+              title="Doing nothing"
+              subtitle="Buy and hold"
               data={result.buy_and_hold}
-              note="Same period, no trading at all"
+              note="Buy on day one of the test years, never sell. The benchmark to beat."
             />
           </div>
 
           <div className={`verdict ${beatsMarket ? "good" : "bad"}`}>
-            {beatsMarket
-              ? "Out of sample, the strategy beat buying and holding."
-              : "Out of sample, the strategy lost to simply buying and holding — the in-sample result was largely overfitting."}
+            {beatsMarket ? (
+              <>
+                <strong>The rule worked.</strong> On years it had never seen, it
+                made more than simply buying the shares and leaving them alone.
+              </>
+            ) : (
+              <>
+                <strong>The rule does not work.</strong> On years it had never
+                seen it made less than simply buying the shares and leaving them
+                alone — so the high practice score came from fitting the rule to
+                the past, not from finding something real.
+              </>
+            )}
           </div>
 
           <div className="chart">
+            <p className="chart-note">
+              How $1 would have grown during the test years. Blue is the rule,
+              grey is doing nothing — if blue sits below grey, the rule lost.
+            </p>
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={result.equity_curve}>
                 <CartesianGrid stroke="#243040" strokeDasharray="3 3" />
